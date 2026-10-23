@@ -1,0 +1,16 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+*.db
+
+# vue
+node_modules/
+dist/
+
+# docker
+*.log
+.DS_Store
