@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import { clearSession, getToken, request } from "./api/client";
 import { ROLE_LABELS } from "./constants";
+import DoctorWorkstationView from "./views/DoctorWorkstationView.vue";
 import LoginView from "./views/LoginView.vue";
 import RegistrationView from "./views/RegistrationView.vue";
 import ScheduleAdminView from "./views/ScheduleAdminView.vue";
@@ -14,20 +15,33 @@ const activeView = ref("registration");
 const notice = ref("");
 
 const isAdmin = computed(() => user.value?.role === "admin");
+const isDoctor = computed(() => user.value?.role === "doctor");
 const roleLabel = computed(
   () => ROLE_LABELS[user.value?.role] || user.value?.role || ""
 );
 
 const navItems = computed(() => {
-  const items = [{ key: "registration", label: "门诊挂号" }];
+  const items = [];
+
   if (isAdmin.value) {
-    items.unshift({ key: "schedules", label: "排班管理" });
+    items.push({ key: "schedules", label: "排班管理" });
   }
+  if (isDoctor.value) {
+    items.push({ key: "workstation", label: "医生工作站" });
+  }
+
+  items.push({ key: "registration", label: "门诊挂号" });
   return items;
 });
 
 function defaultViewFor(currentUser) {
-  return currentUser?.role === "admin" ? "schedules" : "registration";
+  if (currentUser?.role === "admin") {
+    return "schedules";
+  }
+  if (currentUser?.role === "doctor") {
+    return "workstation";
+  }
+  return "registration";
 }
 
 function handleAuthenticated({ token: accessToken, user: currentUser }) {
@@ -104,7 +118,7 @@ onBeforeUnmount(() => {
           <div class="brand-mark" aria-hidden="true">HIS</div>
           <div>
             <p class="brand-title">小型门诊医院信息管理系统</p>
-            <p class="brand-subtitle">门诊挂号与排班工作台</p>
+            <p class="brand-subtitle">门诊挂号 · 医生工作站 · 排班管理</p>
           </div>
         </div>
 
@@ -134,6 +148,9 @@ onBeforeUnmount(() => {
     <main class="workspace">
       <RegistrationView v-if="activeView === 'registration'" />
       <ScheduleAdminView v-else-if="activeView === 'schedules' && isAdmin" />
+      <DoctorWorkstationView
+        v-else-if="activeView === 'workstation' && isDoctor"
+      />
       <section v-else class="card empty-state">
         当前账号没有访问该页面的权限。
       </section>
