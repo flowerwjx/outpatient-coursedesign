@@ -6,7 +6,10 @@ from app.database import Base, engine
 import app.models  # noqa: F401  (register ORM models with Base)
 from app.middleware.audit import AuditMiddleware
 from app.routers.auth import router as auth_router
+from app.routers.charge import router as charge_router
+from app.routers.dispense import router as dispense_router
 from app.routers.doctor import router as doctor_router
+from app.routers.drug import router as drug_router
 from app.routers.prescription import (
     router as prescription_router,
     workbench_router as doctor_workbench_router,
@@ -35,3 +38,6 @@ app.include_router(doctor_workbench_router)
 app.include_router(schedule_router)
 app.include_router(registration_router)
 app.include_router(prescription_router)
+app.include_router(charge_router)
+app.include_router(drug_router)
+app.include_router(dispense_router)

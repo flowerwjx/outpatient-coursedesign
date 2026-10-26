@@ -74,6 +74,9 @@ class PrescriptionOut(BaseModel):
     created_at: datetime
     items: list[PrescriptionItemOut]
     patient_name: Optional[str] = None
+    patient_phone: Optional[str] = None
     department: Optional[str] = None
     schedule_date: Optional[date] = None
     doctor_username: Optional[str] = None
+    dispensed: bool = False
+    dispense_id: Optional[int] = None

@@ -1,3 +1,17 @@
+from app.schemas.charge import (
+    ChargeCreate,
+    ChargeOrderOut,
+    ChargePreviewItemOut,
+    ChargePreviewOut,
+)
+from app.schemas.dispense import DispenseCreate, DispenseItemOut, DispenseRecordOut
+from app.schemas.drug import (
+    DrugCreate,
+    DrugImportError,
+    DrugImportResult,
+    DrugOut,
+    DrugUpdate,
+)
 from app.schemas.prescription import (
     PrescriptionCreate,
     PrescriptionItemCreate,
@@ -9,6 +23,18 @@ from app.schemas.schedule import ScheduleCreate, ScheduleOut, ScheduleUpdate
 from app.schemas.user import LoginRequest, Token, TokenPayload, UserOut
 
 __all__ = [
+    "ChargeCreate",
+    "ChargeOrderOut",
+    "ChargePreviewItemOut",
+    "ChargePreviewOut",
+    "DispenseCreate",
+    "DispenseItemOut",
+    "DispenseRecordOut",
+    "DrugCreate",
+    "DrugImportError",
+    "DrugImportResult",
+    "DrugOut",
+    "DrugUpdate",
     "LoginRequest",
     "PrescriptionCreate",
     "PrescriptionItemCreate",

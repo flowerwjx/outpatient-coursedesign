@@ -3,8 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import { clearSession, getToken, request } from "./api/client";
 import { ROLE_LABELS } from "./constants";
+import CashierChargeView from "./views/CashierChargeView.vue";
 import DoctorWorkstationView from "./views/DoctorWorkstationView.vue";
 import LoginView from "./views/LoginView.vue";
+import PharmacyView from "./views/PharmacyView.vue";
 import RegistrationView from "./views/RegistrationView.vue";
 import ScheduleAdminView from "./views/ScheduleAdminView.vue";
 
@@ -16,6 +18,8 @@ const notice = ref("");
 
 const isAdmin = computed(() => user.value?.role === "admin");
 const isDoctor = computed(() => user.value?.role === "doctor");
+const isCashier = computed(() => user.value?.role === "cashier");
+const isPharmacist = computed(() => user.value?.role === "pharmacist");
 const roleLabel = computed(
   () => ROLE_LABELS[user.value?.role] || user.value?.role || ""
 );
@@ -29,6 +33,12 @@ const navItems = computed(() => {
   if (isDoctor.value) {
     items.push({ key: "workstation", label: "医生工作站" });
   }
+  if (isCashier.value) {
+    items.push({ key: "cashier", label: "收费工作台" });
+  }
+  if (isPharmacist.value) {
+    items.push({ key: "pharmacy", label: "药房工作台" });
+  }
 
   items.push({ key: "registration", label: "门诊挂号" });
   return items;
@@ -40,6 +50,12 @@ function defaultViewFor(currentUser) {
   }
   if (currentUser?.role === "doctor") {
     return "workstation";
+  }
+  if (currentUser?.role === "cashier") {
+    return "cashier";
+  }
+  if (currentUser?.role === "pharmacist") {
+    return "pharmacy";
   }
   return "registration";
 }
@@ -118,7 +134,9 @@ onBeforeUnmount(() => {
           <div class="brand-mark" aria-hidden="true">HIS</div>
           <div>
             <p class="brand-title">小型门诊医院信息管理系统</p>
-            <p class="brand-subtitle">门诊挂号 · 医生工作站 · 排班管理</p>
+            <p class="brand-subtitle">
+              门诊挂号 · 医生工作站 · 收费 · 药房 · 排班管理
+            </p>
           </div>
         </div>
 
@@ -150,6 +168,10 @@ onBeforeUnmount(() => {
       <ScheduleAdminView v-else-if="activeView === 'schedules' && isAdmin" />
       <DoctorWorkstationView
         v-else-if="activeView === 'workstation' && isDoctor"
+      />
+      <CashierChargeView v-else-if="activeView === 'cashier' && isCashier" />
+      <PharmacyView
+        v-else-if="activeView === 'pharmacy' && isPharmacist"
       />
       <section v-else class="card empty-state">
         当前账号没有访问该页面的权限。

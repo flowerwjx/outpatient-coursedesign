@@ -65,10 +65,28 @@ class Prescription(Base):
         lazy="selectin",
         order_by="PrescriptionItem.id",
     )
+    dispense_record = relationship(
+        "DispenseRecord",
+        back_populates="prescription",
+        uselist=False,
+        lazy="selectin",
+    )
+
+    @property
+    def dispensed(self) -> bool:
+        return self.dispense_record is not None
+
+    @property
+    def dispense_id(self) -> Optional[int]:
+        return self.dispense_record.id if self.dispense_record else None
 
     @property
     def patient_name(self) -> Optional[str]:
         return self.registration.patient_name if self.registration else None
+
+    @property
+    def patient_phone(self) -> Optional[str]:
+        return self.registration.phone if self.registration else None
 
     @property
     def department(self) -> Optional[str]:

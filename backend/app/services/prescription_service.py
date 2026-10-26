@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -50,6 +50,35 @@ def list_pending_registrations(
             ~has_prescription,
         )
         .order_by(Registration.created_at.asc(), Registration.id.asc())
+        .all()
+    )
+
+
+def list_prescriptions(
+    db: Session,
+    paid: Optional[bool] = False,
+    patient_name: Optional[str] = None,
+    phone: Optional[str] = None,
+    limit: int = 100,
+) -> Sequence[Prescription]:
+    query = db.query(Prescription)
+    if paid is not None:
+        query = query.filter(Prescription.paid == paid)
+    if patient_name:
+        query = query.filter(
+            Prescription.registration.has(
+                Registration.patient_name.contains(patient_name.strip())
+            )
+        )
+    if phone:
+        query = query.filter(
+            Prescription.registration.has(
+                Registration.phone.contains(phone.strip())
+            )
+        )
+    return (
+        query.order_by(Prescription.created_at.desc(), Prescription.id.desc())
+        .limit(limit)
         .all()
     )
 
