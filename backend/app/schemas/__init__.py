@@ -21,6 +21,7 @@ from app.schemas.prescription import (
 )
 from app.schemas.registration import RegistrationCreate, RegistrationOut
 from app.schemas.schedule import ScheduleCreate, ScheduleOut, ScheduleUpdate
+from app.schemas.statistics import DailyStatisticsOut
 from app.schemas.user import LoginRequest, Token, TokenPayload, UserOut
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "DispenseCreate",
     "DispenseItemOut",
     "DispenseRecordOut",
+    "DailyStatisticsOut",
     "DrugCreate",
     "DrugImportError",
     "DrugImportResult",

@@ -10,6 +10,7 @@ import LoginView from "./views/LoginView.vue";
 import PharmacyView from "./views/PharmacyView.vue";
 import RegistrationView from "./views/RegistrationView.vue";
 import ScheduleAdminView from "./views/ScheduleAdminView.vue";
+import StatisticsView from "./views/StatisticsView.vue";
 
 const booting = ref(true);
 const user = ref(null);
@@ -31,6 +32,7 @@ const navItems = computed(() => {
   if (isAdmin.value) {
     items.push({ key: "schedules", label: "排班管理" });
     items.push({ key: "audit", label: "审计日志" });
+    items.push({ key: "statistics", label: "统计报表" });
   }
   if (isDoctor.value) {
     items.push({ key: "workstation", label: "医生工作站" });
@@ -169,6 +171,7 @@ onBeforeUnmount(() => {
       <RegistrationView v-if="activeView === 'registration'" />
       <ScheduleAdminView v-else-if="activeView === 'schedules' && isAdmin" />
       <AuditLogView v-else-if="activeView === 'audit' && isAdmin" />
+      <StatisticsView v-else-if="activeView === 'statistics' && isAdmin" />
       <DoctorWorkstationView
         v-else-if="activeView === 'workstation' && isDoctor"
       />

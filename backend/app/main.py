@@ -17,6 +17,7 @@ from app.routers.prescription import (
 )
 from app.routers.registration import router as registration_router
 from app.routers.schedule import router as schedule_router
+from app.routers.statistics import router as statistics_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -43,3 +44,4 @@ app.include_router(prescription_router)
 app.include_router(charge_router)
 app.include_router(drug_router)
 app.include_router(dispense_router)
+app.include_router(statistics_router)

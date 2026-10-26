@@ -10,6 +10,7 @@ from app.routers.prescription import (
 )
 from app.routers.registration import router as registration_router
 from app.routers.schedule import router as schedule_router
+from app.routers.statistics import router as statistics_router
 
 __all__ = [
     "audit_router",
@@ -22,4 +23,5 @@ __all__ = [
     "prescription_router",
     "registration_router",
     "schedule_router",
+    "statistics_router",
 ]
