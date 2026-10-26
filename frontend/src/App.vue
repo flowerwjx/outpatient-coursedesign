@@ -22,6 +22,7 @@ const isAdmin = computed(() => user.value?.role === "admin");
 const isDoctor = computed(() => user.value?.role === "doctor");
 const isCashier = computed(() => user.value?.role === "cashier");
 const isPharmacist = computed(() => user.value?.role === "pharmacist");
+const canRegister = computed(() => isAdmin.value || isCashier.value);
 const roleLabel = computed(
   () => ROLE_LABELS[user.value?.role] || user.value?.role || ""
 );
@@ -44,7 +45,10 @@ const navItems = computed(() => {
     items.push({ key: "pharmacy", label: "药房工作台" });
   }
 
-  items.push({ key: "registration", label: "门诊挂号" });
+  if (canRegister.value) {
+    items.push({ key: "registration", label: "门诊挂号" });
+  }
+
   return items;
 });
 
@@ -168,7 +172,9 @@ onBeforeUnmount(() => {
     </header>
 
     <main class="workspace">
-      <RegistrationView v-if="activeView === 'registration'" />
+      <RegistrationView
+        v-if="activeView === 'registration' && canRegister"
+      />
       <ScheduleAdminView v-else-if="activeView === 'schedules' && isAdmin" />
       <AuditLogView v-else-if="activeView === 'audit' && isAdmin" />
       <StatisticsView v-else-if="activeView === 'statistics' && isAdmin" />

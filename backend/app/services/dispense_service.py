@@ -45,6 +45,41 @@ class DispenseConflictError(DispenseServiceError):
     status_code = 409
 
 
+def deduct_stock(db: Session, drug_id: int, qty: int) -> int:
+    try:
+        quantity = int(qty)
+    except (TypeError, ValueError) as exc:
+        raise InvalidDispenseDataError(
+            "quantity must be a positive integer"
+        ) from exc
+
+    if quantity <= 0:
+        raise InvalidDispenseDataError(
+            "quantity must be a positive integer"
+        )
+
+    result = db.execute(
+        update(Drug)
+        .where(
+            Drug.id == drug_id,
+            Drug.stock >= quantity,
+        )
+        .values(stock=Drug.stock - quantity)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        drug = db.get(Drug, drug_id)
+        if drug is None:
+            raise DrugNotFoundError(
+                f"drug {drug_id} not found in drug archive"
+            )
+        raise InsufficientStockError(
+            f"insufficient stock for drug {drug.generic_name}"
+        )
+
+    return quantity
+
+
 def dispense_prescription(
     db: Session, pharmacist: User, payload: DispenseCreate
 ) -> dict:
@@ -79,7 +114,6 @@ def dispense_prescription(
     drug_ids = [item.drug_id for item in items]
     drugs = db.query(Drug).filter(Drug.id.in_(drug_ids)).all()
     drug_map = {drug.id: drug for drug in drugs}
-    drug_names = {drug.id: drug.generic_name for drug in drugs}
 
     for item in items:
         drug = drug_map.get(item.drug_id)
@@ -97,22 +131,12 @@ def dispense_prescription(
                 f"required {int(item.qty)}, available {drug.stock}"
             )
 
-    for item in items:
-        result = db.execute(
-            update(Drug)
-            .where(
-                Drug.id == item.drug_id,
-                Drug.stock >= int(item.qty),
-            )
-            .values(stock=Drug.stock - int(item.qty))
-            .execution_options(synchronize_session=False)
-        )
-        if result.rowcount != 1:
-            db.rollback()
-            name = drug_names.get(item.drug_id, f"#{item.drug_id}")
-            raise InsufficientStockError(
-                f"insufficient stock for drug {name}"
-            )
+    try:
+        for item in items:
+            deduct_stock(db, item.drug_id, item.qty)
+    except DispenseServiceError:
+        db.rollback()
+        raise
 
     record = DispenseRecord(
         prescription_id=prescription.id,

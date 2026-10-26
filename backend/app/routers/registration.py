@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_current_user, require_role
 from app.models.user import User
 from app.schemas.registration import RegistrationCreate, RegistrationOut
 from app.services import registration_service
@@ -39,7 +39,7 @@ def list_registrations(
 def create_registration(
     payload: RegistrationCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_role(["admin", "cashier"])),
 ) -> RegistrationOut:
     try:
         return registration_service.create_registration(db, payload)

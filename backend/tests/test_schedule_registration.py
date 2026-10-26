@@ -83,8 +83,18 @@ def cashier_headers(client):
 
 
 @pytest.fixture(scope="module")
+def pharmacist_headers(client):
+    return _headers(_login(client, "pharmacist", "pha123"))
+
+
+@pytest.fixture(scope="module")
 def doctor_id(client, doctor_headers) -> int:
     return client.get("/api/me", headers=doctor_headers).json()["id"]
+
+
+@pytest.fixture(scope="module")
+def cashier_id(client, cashier_headers) -> int:
+    return client.get("/api/me", headers=cashier_headers).json()["id"]
 
 
 def _user_id(client: TestClient, headers: dict) -> int:
@@ -231,7 +241,7 @@ def test_duplicate_schedule_returns_409(client, admin_headers, doctor_id):
 
 
 def test_available_schedules_filter_by_date_and_department(
-    client, admin_headers, doctor_headers, doctor_id
+    client, admin_headers, doctor_headers, cashier_headers, doctor_id
 ):
     target_date = date(2040, 1, 1)
     internal = _create_schedule(
@@ -279,7 +289,7 @@ def test_available_schedules_filter_by_date_and_department(
     assert [item["id"] for item in surgery_response.json()] == [surgery["id"]]
     assert other_response.json() == []
 
-    assert _register(client, doctor_headers, internal["id"]).status_code == 201
+    assert _register(client, cashier_headers, internal["id"]).status_code == 201
     exhausted_response = client.get(
         "/api/schedules/available",
         params={"date": target_date.isoformat(), "department": "内科"},
@@ -320,12 +330,12 @@ def test_admin_can_list_schedules(client, admin_headers, doctor_headers, doctor_
 
 
 def test_registration_deducts_quota_and_writes_audit_log(
-    client, admin_headers, doctor_headers, doctor_id
+    client, admin_headers, cashier_headers, cashier_id, doctor_id
 ):
     schedule = _create_schedule(client, admin_headers, doctor_id, max_quota=2)
 
     response = _register(
-        client, doctor_headers, schedule["id"], name="李四", phone="13900139000"
+        client, cashier_headers, schedule["id"], name="李四", phone="13900139000"
     )
 
     assert response.status_code == 201
@@ -349,20 +359,20 @@ def test_registration_deducts_quota_and_writes_audit_log(
         db.close()
 
     assert log is not None
-    assert log.operator_id == doctor_id
+    assert log.operator_id == cashier_id
     assert log.method == "POST"
     assert log.status_code == 201
 
 
 def test_registration_when_quota_exhausted_returns_400_and_rolls_back(
-    client, admin_headers, doctor_headers, doctor_id
+    client, admin_headers, cashier_headers, doctor_id
 ):
     schedule = _create_schedule(client, admin_headers, doctor_id, max_quota=1)
 
-    assert _register(client, doctor_headers, schedule["id"]).status_code == 201
+    assert _register(client, cashier_headers, schedule["id"]).status_code == 201
     response = _register(
         client,
-        doctor_headers,
+        cashier_headers,
         schedule["id"],
         name="王五",
         phone="13700137000",
@@ -374,8 +384,8 @@ def test_registration_when_quota_exhausted_returns_400_and_rolls_back(
     assert _registration_count(schedule["id"]) == 1
 
 
-def test_registration_for_missing_schedule_returns_404(client, doctor_headers):
-    response = _register(client, doctor_headers, 999999999)
+def test_registration_for_missing_schedule_returns_404(client, cashier_headers):
+    response = _register(client, cashier_headers, 999999999)
     assert response.status_code == 404
 
 
@@ -394,15 +404,80 @@ def test_registration_requires_login(client, admin_headers, doctor_id):
     assert response.status_code == 401
 
 
-def test_update_schedule_recalculates_remaining_and_blocks_used_quota(
-    client, admin_headers, doctor_headers, doctor_id
+def test_registration_permissions_are_admin_and_cashier_only(
+    client,
+    admin_headers,
+    doctor_headers,
+    cashier_headers,
+    pharmacist_headers,
+    doctor_id,
 ):
     schedule = _create_schedule(client, admin_headers, doctor_id, max_quota=3)
-    assert _register(client, doctor_headers, schedule["id"]).status_code == 201
+    payload = {
+        "patient_name": "权限验证患者",
+        "phone": "13600136000",
+        "schedule_id": schedule["id"],
+    }
+
+    assert (
+        client.post(
+            "/api/registrations", json=payload, headers=doctor_headers
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            "/api/registrations", json=payload, headers=pharmacist_headers
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            "/api/registrations", json=payload, headers=admin_headers
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/registrations", json=payload, headers=cashier_headers
+        ).status_code
+        == 201
+    )
+
+    assert _schedule_state(schedule["id"]) == (3, 1)
+    assert _registration_count(schedule["id"]) == 2
+
+    available_params = {
+        "date": schedule["schedule_date"],
+        "department": schedule["department"],
+    }
+    assert (
+        client.get(
+            "/api/schedules/available",
+            params=available_params,
+            headers=doctor_headers,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.get(
+            "/api/schedules/available",
+            params=available_params,
+            headers=pharmacist_headers,
+        ).status_code
+        == 200
+    )
+
+
+def test_update_schedule_recalculates_remaining_and_blocks_used_quota(
+    client, admin_headers, cashier_headers, doctor_id
+):
+    schedule = _create_schedule(client, admin_headers, doctor_id, max_quota=3)
+    assert _register(client, cashier_headers, schedule["id"]).status_code == 201
     assert (
         _register(
             client,
-            doctor_headers,
+            cashier_headers,
             schedule["id"],
             name="孙七",
             phone="13500135000",
@@ -451,10 +526,10 @@ def test_update_schedule_with_empty_payload_returns_422(
 
 
 def test_delete_schedule_blocked_when_registrations_exist(
-    client, admin_headers, doctor_headers, doctor_id
+    client, admin_headers, cashier_headers, doctor_id
 ):
     schedule = _create_schedule(client, admin_headers, doctor_id)
-    assert _register(client, doctor_headers, schedule["id"]).status_code == 201
+    assert _register(client, cashier_headers, schedule["id"]).status_code == 201
 
     response = client.delete(
         f"/api/schedules/{schedule['id']}", headers=admin_headers
@@ -475,11 +550,11 @@ def test_delete_schedule_without_registrations(client, admin_headers, doctor_id)
     assert _schedule_state(schedule["id"]) is None
 
 def test_list_registrations_returns_schedule_info(
-    client, admin_headers, doctor_headers, doctor_id
+    client, admin_headers, doctor_headers, cashier_headers, doctor_id
 ):
     schedule = _create_schedule(client, admin_headers, doctor_id, max_quota=2)
     created = _register(
-        client, doctor_headers, schedule["id"], name="周八", phone="13400134000"
+        client, cashier_headers, schedule["id"], name="周八", phone="13400134000"
     ).json()
 
     response = client.get(
