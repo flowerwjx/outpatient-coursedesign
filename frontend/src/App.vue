@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import { clearSession, getToken, request } from "./api/client";
 import { ROLE_LABELS } from "./constants";
+import AuditLogView from "./views/AuditLogView.vue";
 import CashierChargeView from "./views/CashierChargeView.vue";
 import DoctorWorkstationView from "./views/DoctorWorkstationView.vue";
 import LoginView from "./views/LoginView.vue";
@@ -29,6 +30,7 @@ const navItems = computed(() => {
 
   if (isAdmin.value) {
     items.push({ key: "schedules", label: "排班管理" });
+    items.push({ key: "audit", label: "审计日志" });
   }
   if (isDoctor.value) {
     items.push({ key: "workstation", label: "医生工作站" });
@@ -166,6 +168,7 @@ onBeforeUnmount(() => {
     <main class="workspace">
       <RegistrationView v-if="activeView === 'registration'" />
       <ScheduleAdminView v-else-if="activeView === 'schedules' && isAdmin" />
+      <AuditLogView v-else-if="activeView === 'audit' && isAdmin" />
       <DoctorWorkstationView
         v-else-if="activeView === 'workstation' && isDoctor"
       />

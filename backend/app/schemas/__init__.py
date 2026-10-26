@@ -1,3 +1,4 @@
+from app.schemas.audit import AuditLogOut
 from app.schemas.charge import (
     ChargeCreate,
     ChargeOrderOut,
@@ -23,6 +24,7 @@ from app.schemas.schedule import ScheduleCreate, ScheduleOut, ScheduleUpdate
 from app.schemas.user import LoginRequest, Token, TokenPayload, UserOut
 
 __all__ = [
+    "AuditLogOut",
     "ChargeCreate",
     "ChargeOrderOut",
     "ChargePreviewItemOut",

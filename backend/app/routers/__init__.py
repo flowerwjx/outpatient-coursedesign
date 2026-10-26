@@ -1,3 +1,4 @@
+from app.routers.audit import router as audit_router
 from app.routers.auth import router as auth_router
 from app.routers.charge import router as charge_router
 from app.routers.dispense import router as dispense_router
@@ -11,6 +12,7 @@ from app.routers.registration import router as registration_router
 from app.routers.schedule import router as schedule_router
 
 __all__ = [
+    "audit_router",
     "auth_router",
     "charge_router",
     "dispense_router",
