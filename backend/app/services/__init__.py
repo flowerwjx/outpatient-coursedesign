@@ -1,3 +1,3 @@
-from app.services import user_service
+from app.services import registration_service, schedule_service, user_service
 
-__all__ = ["user_service"]
+__all__ = ["registration_service", "schedule_service", "user_service"]

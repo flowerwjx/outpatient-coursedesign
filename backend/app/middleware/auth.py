@@ -1,7 +1,7 @@
 import time
 from typing import Iterable, List, Optional, Union
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -36,6 +36,7 @@ def create_access_token(user: User, expires_delta: Optional[int] = None) -> str:
 
 
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
@@ -52,6 +53,9 @@ def get_current_user(
     user = user_service.get_by_id(db, int(user_id))
     if user is None or user.role != token_role:
         raise _CREDENTIALS_EXCEPTION
+
+    # Consumed by the audit middleware to record the operator of write requests.
+    request.state.user_id = user.id
     return user
 
 

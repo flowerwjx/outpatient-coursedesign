@@ -6,6 +6,9 @@ from app.database import Base, engine
 import app.models  # noqa: F401  (register ORM models with Base)
 from app.middleware.audit import AuditMiddleware
 from app.routers.auth import router as auth_router
+from app.routers.doctor import router as doctor_router
+from app.routers.registration import router as registration_router
+from app.routers.schedule import router as schedule_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -23,3 +26,6 @@ if CORS_ALLOW_ORIGINS:
 app.add_middleware(AuditMiddleware)
 
 app.include_router(auth_router)
+app.include_router(doctor_router)
+app.include_router(schedule_router)
+app.include_router(registration_router)

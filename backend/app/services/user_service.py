@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Sequence
 
 import bcrypt
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +33,10 @@ def get_by_id(db: Session, user_id: int) -> Optional[User]:
 
 def get_by_username(db: Session, username: str) -> Optional[User]:
     return db.query(User).filter(User.username == username).first()
+
+
+def list_by_role(db: Session, role: UserRole) -> Sequence[User]:
+    return db.query(User).filter(User.role == role).order_by(User.id).all()
 
 
 def create_user(
