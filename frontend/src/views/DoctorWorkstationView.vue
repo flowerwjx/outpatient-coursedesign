@@ -23,6 +23,20 @@ const ICD10_SUGGESTIONS = Object.freeze([
   { code: "A09.9", name: "感染性腹泻" },
 ]);
 
+function localToday() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+const activeTab = ref("pending");
+const todayDate = localToday();
+const visitedDate = ref(todayDate);
+const visitedRecords = ref([]);
+const loadingVisited = ref(false);
+const visitedError = ref("");
+const expandedRegistrationId = ref(null);
+
 const registrations = ref([]);
 const loadingPatients = ref(false);
 const loadError = ref("");
@@ -122,6 +136,38 @@ async function loadDrugs() {
   } finally {
     loadingDrugs.value = false;
   }
+}
+
+async function loadVisited() {
+  loadingVisited.value = true;
+  visitedError.value = "";
+  expandedRegistrationId.value = null;
+
+  try {
+    const data = await request("/api/doctor/visited", {
+      params: { date: visitedDate.value },
+    });
+    visitedRecords.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    visitedRecords.value = [];
+    visitedError.value = friendlyError(error);
+  } finally {
+    loadingVisited.value = false;
+  }
+}
+
+function switchTab(tab) {
+  activeTab.value = tab;
+  if (tab === "visited") {
+    loadVisited();
+  }
+}
+
+function toggleRecord(record) {
+  expandedRegistrationId.value =
+    expandedRegistrationId.value === record.registration_id
+      ? null
+      : record.registration_id;
 }
 
 async function loadPending() {
@@ -296,7 +342,28 @@ onMounted(() => {
 
 <template>
   <section class="doctor-page">
-    <div class="workstation-grid">
+    <div class="workstation-tabs card">
+      <button
+        type="button"
+        class="doctor-tab"
+        :class="{ active: activeTab === 'pending' }"
+        @click="switchTab('pending')"
+      >
+        待接诊
+        <span class="badge badge-blue">{{ registrations.length }}</span>
+      </button>
+      <button
+        type="button"
+        class="doctor-tab"
+        :class="{ active: activeTab === 'visited' }"
+        @click="switchTab('visited')"
+      >
+        接诊记录
+      </button>
+      <span class="tab-note">接诊记录按就诊日期筛选，默认今天</span>
+    </div>
+
+    <div v-if="activeTab === 'pending'" class="workstation-grid">
       <article class="card patient-panel">
         <div class="card-head">
           <div>
@@ -664,6 +731,118 @@ onMounted(() => {
         </div>
       </article>
     </div>
+
+    <article v-else class="card visited-panel">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">接诊记录</h2>
+          <p class="card-subtitle">
+            展示当前医生已开具处方的患者，按排班就诊日期筛选。点击记录可展开药品明细。
+          </p>
+        </div>
+        <span class="badge badge-gray">{{ visitedRecords.length }} 条</span>
+      </div>
+
+      <div class="toolbar">
+        <label class="field date-field">
+          <span class="field-label">就诊日期</span>
+          <input
+            v-model="visitedDate"
+            class="input"
+            type="date"
+            :max="todayDate"
+            @change="loadVisited"
+          />
+        </label>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          :disabled="loadingVisited"
+          @click="loadVisited"
+        >
+          刷新
+        </button>
+      </div>
+
+      <p v-if="visitedError" class="alert alert-error list-alert" role="alert">
+        {{ visitedError }}
+      </p>
+
+      <div v-else-if="loadingVisited" class="empty-state">
+        <span class="spinner" aria-hidden="true"></span>
+        正在加载接诊记录...
+      </div>
+
+      <div v-else-if="visitedRecords.length === 0" class="empty-state">
+        该日期暂无接诊记录。
+      </div>
+
+      <ul v-else class="visited-list">
+        <li
+          v-for="record in visitedRecords"
+          :key="record.registration_id"
+          class="visited-item"
+        >
+          <button
+            type="button"
+            class="visited-row"
+            @click="toggleRecord(record)"
+          >
+            <span class="visited-main">
+              <span class="visited-title">
+                {{ record.patient_name }}
+                <span class="mono">#{{ record.registration_id }}</span>
+              </span>
+              <span class="visited-meta">
+                {{ record.patient_phone || "-" }} · 开方时间
+                {{ formatDateTime(record.visited_at) }}
+              </span>
+              <span class="visited-meta">
+                就诊日期 {{ formatDate(record.visit_date) }} ·
+                {{ record.icd10_code }} · {{ record.diagnosis_name }}
+              </span>
+            </span>
+
+            <span class="visited-side">
+              <span class="badge badge-blue">
+                {{ record.items.length }} 种药品
+              </span>
+              <span class="expand-text">
+                {{
+                  expandedRegistrationId === record.registration_id
+                    ? "收起明细"
+                    : "展开明细"
+                }}
+              </span>
+            </span>
+          </button>
+
+          <div
+            v-if="expandedRegistrationId === record.registration_id"
+            class="visited-detail"
+          >
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>药品</th>
+                    <th>规格</th>
+                    <th>数量</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in record.items" :key="item.drug_id">
+                    <td>{{ item.drug_name }}</td>
+                    <td>{{ item.spec }}</td>
+                    <td>{{ item.qty }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </article>
   </section>
 </template>
 
@@ -671,6 +850,143 @@ onMounted(() => {
 .doctor-page {
   display: grid;
   gap: 20px;
+}
+
+.workstation-tabs {
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doctor-tab {
+  min-height: 38px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.doctor-tab:hover {
+  color: #1d4ed8;
+}
+
+.doctor-tab.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.tab-note {
+  margin-left: auto;
+  padding-right: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.date-field {
+  width: 180px;
+}
+
+.visited-panel {
+  min-width: 0;
+}
+
+.visited-list {
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  list-style: none;
+}
+
+.visited-item {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.visited-row {
+  width: 100%;
+  padding: 13px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border: none;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.visited-row:hover {
+  background: #f8fbff;
+}
+
+.visited-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.visited-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.visited-title .mono {
+  margin-left: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.visited-meta {
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.visited-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+
+.expand-text {
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.visited-detail {
+  padding: 10px 14px 14px;
+  border-top: 1px solid #edf1f7;
+  background: #f8fafc;
+}
+
+.visited-detail .data-table {
+  overflow: hidden;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .workstation-grid {
@@ -1061,6 +1377,31 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
+  .workstation-tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab-note {
+    width: 100%;
+    margin-left: 0;
+    padding: 4px 6px;
+  }
+
+  .date-field {
+    width: 100%;
+  }
+
+  .visited-row {
+    flex-direction: column;
+  }
+
+  .visited-side {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .selected-drug-row {
     grid-template-columns: 1fr;
   }

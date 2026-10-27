@@ -1,8 +1,10 @@
+from datetime import date
 from typing import Optional, Sequence
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.models.drug import Drug
 from app.models.prescription import Prescription, PrescriptionItem
 from app.models.registration import Registration, RegistrationStatus
 from app.models.schedule import Schedule
@@ -52,6 +54,75 @@ def list_pending_registrations(
         .order_by(Registration.created_at.asc(), Registration.id.asc())
         .all()
     )
+
+
+def list_visited_registrations(
+    db: Session,
+    doctor_id: int,
+    target_date: Optional[date] = None,
+) -> list[dict]:
+    day = target_date or date.today()
+    prescriptions = (
+        db.query(Prescription)
+        .join(Registration, Prescription.registration_id == Registration.id)
+        .join(Schedule, Registration.schedule_id == Schedule.id)
+        .filter(
+            Prescription.doctor_id == doctor_id,
+            Schedule.schedule_date == day,
+        )
+        .order_by(Prescription.created_at.desc(), Prescription.id.desc())
+        .all()
+    )
+
+    drug_ids = {
+        item.drug_id
+        for prescription in prescriptions
+        for item in prescription.items
+    }
+    drugs = (
+        db.query(Drug).filter(Drug.id.in_(drug_ids)).all() if drug_ids else []
+    )
+    drug_map = {drug.id: drug for drug in drugs}
+
+    result = []
+    for prescription in prescriptions:
+        registration = prescription.registration
+        schedule = registration.schedule if registration else None
+        items = []
+        for item in prescription.items:
+            drug = drug_map.get(item.drug_id)
+            items.append(
+                {
+                    "drug_id": item.drug_id,
+                    "drug_name": (
+                        drug.generic_name
+                        if drug
+                        else f"药品 #{item.drug_id}"
+                    ),
+                    "spec": drug.spec if drug else "-",
+                    "qty": item.qty,
+                }
+            )
+
+        result.append(
+            {
+                "registration_id": prescription.registration_id,
+                "prescription_id": prescription.id,
+                "patient_name": (
+                    registration.patient_name if registration else ""
+                ),
+                "patient_phone": registration.phone if registration else None,
+                "visit_date": (
+                    schedule.schedule_date if schedule else day
+                ),
+                "visited_at": prescription.created_at,
+                "icd10_code": prescription.icd10_code,
+                "diagnosis_name": prescription.diagnosis_name,
+                "items": items,
+            }
+        )
+
+    return result
 
 
 def list_prescriptions(

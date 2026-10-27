@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 _TMP_DIR = tempfile.mkdtemp(prefix="his_prescription_test_")
@@ -21,6 +22,7 @@ from fastapi.testclient import TestClient
 from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.audit import AuditLog
+from app.models.drug import Drug
 from app.models.prescription import Prescription, PrescriptionItem
 from app.models.registration import Registration, RegistrationStatus
 from app.models.user import UserRole
@@ -49,6 +51,32 @@ def client():
     try:
         for username, password, role in ACCOUNTS:
             create_user(db, username=username, password=password, role=role)
+
+        db.add_all(
+            [
+                Drug(
+                    id=1,
+                    generic_name="接诊药品A",
+                    trade_name="",
+                    spec="10mg×10片",
+                    dosage_form="片剂",
+                    insurance_type="甲类",
+                    unit_price=Decimal("10.00"),
+                    stock=100,
+                ),
+                Drug(
+                    id=2,
+                    generic_name="接诊药品B",
+                    trade_name="",
+                    spec="20mg×20片",
+                    dosage_form="胶囊剂",
+                    insurance_type="乙类",
+                    unit_price=Decimal("5.00"),
+                    stock=100,
+                ),
+            ]
+        )
+        db.commit()
     finally:
         db.close()
 
@@ -476,3 +504,142 @@ def test_prescription_validation_rejects_invalid_payload(
     )
 
     assert response.status_code == 422
+
+
+def test_doctor_visited_records_filter_by_date_and_include_items(
+    client,
+    admin_headers,
+    doctor_headers,
+    doctor2_headers,
+    cashier_headers,
+    pharmacist_headers,
+    doctor_id,
+):
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    today_schedule = _create_schedule(
+        client,
+        admin_headers,
+        doctor_id,
+        department="接诊记录科",
+        schedule_date=today.isoformat(),
+    )
+    today_registration = _register(
+        client,
+        admin_headers,
+        today_schedule["id"],
+        name="今日接诊患者",
+        phone="13800138010",
+    )
+    assert today_registration.status_code == 201
+    today_registration_body = today_registration.json()
+    today_prescription = _create_prescription(
+        client,
+        doctor_headers,
+        _prescription_payload(
+            today_registration_body["id"],
+            diagnosis_name="今日诊断",
+        ),
+    )
+    assert today_prescription.status_code == 201
+
+    yesterday_schedule = _create_schedule(
+        client,
+        admin_headers,
+        doctor_id,
+        department="接诊记录科",
+        schedule_date=yesterday.isoformat(),
+    )
+    yesterday_registration = _register(
+        client,
+        admin_headers,
+        yesterday_schedule["id"],
+        name="昨日接诊患者",
+        phone="13800138011",
+    )
+    assert yesterday_registration.status_code == 201
+    yesterday_registration_body = yesterday_registration.json()
+    yesterday_prescription = _create_prescription(
+        client,
+        doctor_headers,
+        _prescription_payload(
+            yesterday_registration_body["id"],
+            icd10_code="I10",
+            diagnosis_name="昨日诊断",
+            items=[{"drug_id": 1, "qty": 1}],
+        ),
+    )
+    assert yesterday_prescription.status_code == 201
+
+    today_response = client.get(
+        "/api/doctor/visited",
+        params={"date": today.isoformat()},
+        headers=doctor_headers,
+    )
+    assert today_response.status_code == 200
+    today_records = today_response.json()
+    today_record = next(
+        item
+        for item in today_records
+        if item["registration_id"] == today_registration_body["id"]
+    )
+    assert today_record["patient_name"] == "今日接诊患者"
+    assert today_record["visit_date"] == today.isoformat()
+    assert today_record["visited_at"]
+    assert today_record["icd10_code"] == "J06.9"
+    assert today_record["diagnosis_name"] == "今日诊断"
+    assert {
+        (item["drug_id"], item["qty"]) for item in today_record["items"]
+    } == {(1, 2), (2, 1)}
+    assert {item["drug_name"] for item in today_record["items"]} == {
+        "接诊药品A",
+        "接诊药品B",
+    }
+
+    default_response = client.get(
+        "/api/doctor/visited", headers=doctor_headers
+    )
+    assert default_response.status_code == 200
+    assert today_registration_body["id"] in {
+        item["registration_id"] for item in default_response.json()
+    }
+
+    yesterday_response = client.get(
+        "/api/doctor/visited",
+        params={"date": yesterday.isoformat()},
+        headers=doctor_headers,
+    )
+    assert yesterday_response.status_code == 200
+    yesterday_record = next(
+        item
+        for item in yesterday_response.json()
+        if item["registration_id"] == yesterday_registration_body["id"]
+    )
+    assert yesterday_record["diagnosis_name"] == "昨日诊断"
+    assert yesterday_record["visit_date"] == yesterday.isoformat()
+
+    other_doctor_response = client.get(
+        "/api/doctor/visited",
+        params={"date": today.isoformat()},
+        headers=doctor2_headers,
+    )
+    assert other_doctor_response.status_code == 200
+    assert all(
+        item["registration_id"] != today_registration_body["id"]
+        for item in other_doctor_response.json()
+    )
+
+    assert (
+        client.get(
+            "/api/doctor/visited", headers=cashier_headers
+        ).status_code
+        == 403
+    )
+    assert (
+        client.get(
+            "/api/doctor/visited", headers=pharmacist_headers
+        ).status_code
+        == 403
+    )
+    assert client.get("/api/doctor/visited").status_code == 401

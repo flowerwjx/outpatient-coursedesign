@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,7 +8,11 @@ from app.database import get_db
 from app.middleware.auth import require_role
 from app.models.user import User
 from app.schemas.charge import ChargePreviewOut
-from app.schemas.prescription import PrescriptionCreate, PrescriptionOut
+from app.schemas.prescription import (
+    PrescriptionCreate,
+    PrescriptionOut,
+    VisitedRegistrationOut,
+)
 from app.schemas.registration import RegistrationOut
 from app.services import charge_service, prescription_service
 
@@ -28,6 +33,19 @@ def list_my_pending_registrations(
 ) -> list[RegistrationOut]:
     return list(
         prescription_service.list_pending_registrations(db, current_user.id)
+    )
+
+
+@workbench_router.get("/visited", response_model=list[VisitedRegistrationOut])
+def list_visited_registrations(
+    schedule_date: Optional[date] = Query(default=None, alias="date"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["doctor"])),
+) -> list[VisitedRegistrationOut]:
+    return list(
+        prescription_service.list_visited_registrations(
+            db, current_user.id, schedule_date
+        )
     )
 
 

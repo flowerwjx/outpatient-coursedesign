@@ -62,6 +62,25 @@ class PrescriptionItemOut(BaseModel):
     qty: int
 
 
+class VisitedPrescriptionItemOut(BaseModel):
+    drug_id: int
+    drug_name: str
+    spec: str
+    qty: int
+
+
+class VisitedRegistrationOut(BaseModel):
+    registration_id: int
+    prescription_id: int
+    patient_name: str
+    patient_phone: Optional[str] = None
+    visit_date: date
+    visited_at: datetime
+    icd10_code: str
+    diagnosis_name: str
+    items: list[VisitedPrescriptionItemOut]
+
+
 class PrescriptionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
