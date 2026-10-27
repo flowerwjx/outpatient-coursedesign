@@ -298,6 +298,40 @@ def test_available_schedules_filter_by_date_and_department(
     assert exhausted_response.json() == []
 
 
+def test_available_schedules_without_department_returns_all(
+    client, admin_headers, doctor_headers, doctor_id
+):
+    target_date = date(2041, 6, 1)
+    internal = _create_schedule(
+        client,
+        admin_headers,
+        doctor_id,
+        department="内科",
+        schedule_date=target_date.isoformat(),
+    )
+    surgery = _create_schedule(
+        client,
+        admin_headers,
+        doctor_id,
+        department="外科",
+        schedule_date=target_date.isoformat(),
+    )
+
+    response = client.get(
+        "/api/schedules/available",
+        params={"date": target_date.isoformat()},
+        headers=doctor_headers,
+    )
+
+    assert response.status_code == 200
+    records = response.json()
+    assert {item["id"] for item in records} == {
+        internal["id"],
+        surgery["id"],
+    }
+    assert {item["department"] for item in records} == {"内科", "外科"}
+
+
 def test_available_schedules_require_login(client):
     response = client.get(
         "/api/schedules/available",

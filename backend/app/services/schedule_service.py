@@ -134,15 +134,12 @@ def list_schedules(
 
 
 def list_available_schedules(
-    db: Session, schedule_date: date, department: str
+    db: Session, schedule_date: date, department: Optional[str] = None
 ) -> Sequence[Schedule]:
-    return (
-        db.query(Schedule)
-        .filter(
-            Schedule.schedule_date == schedule_date,
-            Schedule.department == department.strip(),
-            Schedule.remaining_quota > 0,
-        )
-        .order_by(Schedule.department, Schedule.id)
-        .all()
+    query = db.query(Schedule).filter(
+        Schedule.schedule_date == schedule_date,
+        Schedule.remaining_quota > 0,
     )
+    if department:
+        query = query.filter(Schedule.department == department.strip())
+    return query.order_by(Schedule.department, Schedule.id).all()

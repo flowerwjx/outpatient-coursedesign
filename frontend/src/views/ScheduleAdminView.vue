@@ -288,16 +288,16 @@ onMounted(async () => {
           </label>
           <label class="field filter-field">
             <span class="field-label">科室</span>
-            <input
-              v-model="filters.department"
-              class="input"
-              list="admin-department-options"
-              type="text"
-              placeholder="全部科室"
-            />
-            <datalist id="admin-department-options">
-              <option v-for="item in DEPARTMENTS" :key="item" :value="item" />
-            </datalist>
+            <select v-model="filters.department" class="select">
+              <option value="">全部科室</option>
+              <option
+                v-for="item in DEPARTMENTS"
+                :key="item"
+                :value="item"
+              >
+                {{ item }}
+              </option>
+            </select>
           </label>
           <button
             class="btn btn-secondary"
@@ -343,16 +343,16 @@ onMounted(async () => {
           <div class="form-grid two">
             <label class="field">
               <span class="field-label">科室</span>
-              <input
-                v-model="form.department"
-                class="input"
-                list="admin-form-department-options"
-                type="text"
-                placeholder="请输入科室"
-              />
-              <datalist id="admin-form-department-options">
-                <option v-for="item in DEPARTMENTS" :key="item" :value="item" />
-              </datalist>
+              <select v-model="form.department" class="select">
+                <option value="" disabled>请选择科室</option>
+                <option
+                  v-for="item in DEPARTMENTS"
+                  :key="item"
+                  :value="item"
+                >
+                  {{ item }}
+                </option>
+              </select>
             </label>
 
             <label class="field">

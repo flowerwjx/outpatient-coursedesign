@@ -50,7 +50,7 @@ def list_schedules(
 @router.get("/available", response_model=list[ScheduleOut])
 def list_available_schedules(
     schedule_date: date = Query(..., alias="date"),
-    department: str = Query(..., min_length=1, max_length=100),
+    department: Optional[str] = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[ScheduleOut]:

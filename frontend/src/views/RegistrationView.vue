@@ -122,10 +122,6 @@ async function loadAvailable() {
     scheduleError.value = "请选择就诊日期";
     return;
   }
-  if (!department) {
-    scheduleError.value = "请选择或输入科室";
-    return;
-  }
 
   loadingSchedules.value = true;
   scheduleError.value = "";
@@ -278,16 +274,16 @@ onMounted(() => {
 
           <label class="field query-field">
             <span class="field-label">科室</span>
-            <input
-              v-model="query.department"
-              class="input"
-              list="department-options"
-              type="text"
-              placeholder="选择或输入科室"
-            />
-            <datalist id="department-options">
-              <option v-for="item in DEPARTMENTS" :key="item" :value="item" />
-            </datalist>
+            <select v-model="query.department" class="select">
+              <option value="">全部科室</option>
+              <option
+                v-for="item in DEPARTMENTS"
+                :key="item"
+                :value="item"
+              >
+                {{ item }}
+              </option>
+            </select>
           </label>
 
           <label class="field query-field">
