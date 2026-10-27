@@ -6,106 +6,9 @@ import { formatDate, formatDateTime } from "../constants";
 
 const ICD10_PATTERN = /^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$/;
 
-// 课程演示药品目录。后端处方接口当前只保存 drug_id，
-// 待药品档案模块完成后，应替换为 GET /api/drugs 返回的真实药品目录。
-const DEMO_DRUGS = Object.freeze([
-  {
-    id: 1,
-    generic_name: "阿莫西林胶囊",
-    trade_name: "阿莫仙",
-    spec: "0.25g×24粒",
-    dosage_form: "胶囊剂",
-    insurance_type: "甲类",
-  },
-  {
-    id: 2,
-    generic_name: "布洛芬缓释胶囊",
-    trade_name: "芬必得",
-    spec: "0.3g×20粒",
-    dosage_form: "胶囊剂",
-    insurance_type: "乙类",
-  },
-  {
-    id: 3,
-    generic_name: "对乙酰氨基酚片",
-    trade_name: "扑热息痛",
-    spec: "0.5g×20片",
-    dosage_form: "片剂",
-    insurance_type: "甲类",
-  },
-  {
-    id: 4,
-    generic_name: "头孢克肟分散片",
-    trade_name: "世福素",
-    spec: "0.1g×12片",
-    dosage_form: "分散片",
-    insurance_type: "乙类",
-  },
-  {
-    id: 5,
-    generic_name: "氯雷他定片",
-    trade_name: "开瑞坦",
-    spec: "10mg×6片",
-    dosage_form: "片剂",
-    insurance_type: "乙类",
-  },
-  {
-    id: 6,
-    generic_name: "奥美拉唑肠溶胶囊",
-    trade_name: "洛赛克",
-    spec: "20mg×14粒",
-    dosage_form: "肠溶胶囊",
-    insurance_type: "甲类",
-  },
-  {
-    id: 7,
-    generic_name: "蒙脱石散",
-    trade_name: "思密达",
-    spec: "3g×10袋",
-    dosage_form: "散剂",
-    insurance_type: "甲类",
-  },
-  {
-    id: 8,
-    generic_name: "氨溴索口服溶液",
-    trade_name: "沐舒坦",
-    spec: "100ml",
-    dosage_form: "口服溶液",
-    insurance_type: "乙类",
-  },
-  {
-    id: 9,
-    generic_name: "复方甘草片",
-    trade_name: "",
-    spec: "100片",
-    dosage_form: "片剂",
-    insurance_type: "甲类",
-  },
-  {
-    id: 10,
-    generic_name: "维生素C片",
-    trade_name: "",
-    spec: "0.1g×100片",
-    dosage_form: "片剂",
-    insurance_type: "甲类",
-  },
-  {
-    id: 11,
-    generic_name: "硝苯地平控释片",
-    trade_name: "拜新同",
-    spec: "30mg×7片",
-    dosage_form: "控释片",
-    insurance_type: "甲类",
-  },
-  {
-    id: 12,
-    generic_name: "二甲双胍缓释片",
-    trade_name: "格华止",
-    spec: "0.5g×30片",
-    dosage_form: "缓释片",
-    insurance_type: "甲类",
-  },
-]);
+const drugs = ref([]);
+const loadingDrugs = ref(false);
+const drugsError = ref("");
 
 const ICD10_SUGGESTIONS = Object.freeze([
   { code: "J06.9", name: "急性上呼吸道感染" },
@@ -138,7 +41,7 @@ const successMessage = ref("");
 const lastCreated = ref(null);
 
 const drugMap = computed(
-  () => new Map(DEMO_DRUGS.map((drug) => [drug.id, drug]))
+  () => new Map(drugs.value.map((drug) => [drug.id, drug]))
 );
 
 const selectedRegistration = computed(
@@ -166,9 +69,9 @@ const visibleRegistrations = computed(() => {
 const filteredDrugs = computed(() => {
   const keyword = drugKeyword.value.trim().toLowerCase();
   if (!keyword) {
-    return DEMO_DRUGS;
+    return drugs.value;
   }
-  return DEMO_DRUGS.filter((drug) => {
+  return drugs.value.filter((drug) => {
     return [drug.generic_name, drug.trade_name, drug.spec].some((value) =>
       String(value || "").toLowerCase().includes(keyword)
     );
@@ -204,6 +107,21 @@ function friendlyError(error) {
     return "该挂号已不处于待接诊状态，请刷新列表";
   }
   return message;
+}
+
+async function loadDrugs() {
+  loadingDrugs.value = true;
+  drugsError.value = "";
+
+  try {
+    const data = await request("/api/drugs", { params: { limit: 500 } });
+    drugs.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    drugs.value = [];
+    drugsError.value = friendlyError(error);
+  } finally {
+    loadingDrugs.value = false;
+  }
 }
 
 async function loadPending() {
@@ -370,7 +288,10 @@ async function submitPrescription() {
   }
 }
 
-onMounted(loadPending);
+onMounted(() => {
+  loadDrugs();
+  loadPending();
+});
 </script>
 
 <template>
@@ -557,7 +478,7 @@ onMounted(loadPending);
                 <div>
                   <h3>处方药品</h3>
                   <p class="field-note">
-                    当前为课程演示药品目录，后端处方接口按 drug_id 保存明细。
+                    药品目录来自后端药品档案，提交时使用药品真实 id。
                   </p>
                 </div>
                 <span class="badge badge-gray">
@@ -572,7 +493,20 @@ onMounted(loadPending);
                 placeholder="搜索通用名、商品名或规格"
               />
 
-              <div class="drug-picker">
+              <p
+                v-if="drugsError"
+                class="alert alert-error"
+                role="alert"
+              >
+                {{ drugsError }}
+              </p>
+
+              <div v-else-if="loadingDrugs" class="empty-state">
+                <span class="spinner" aria-hidden="true"></span>
+                正在加载药品档案...
+              </div>
+
+              <div v-else class="drug-picker">
                 <div class="drug-catalog">
                   <button
                     v-for="drug in filteredDrugs"
