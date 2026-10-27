@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import CORS_ALLOW_ORIGINS
 from app.database import Base, engine
@@ -49,3 +53,30 @@ app.include_router(drug_router)
 app.include_router(dispense_router)
 app.include_router(statistics_router)
 app.include_router(dashboard_router)
+
+
+STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+
+if STATIC_DIR.is_dir():
+    assets_dir = STATIC_DIR / "assets"
+    if assets_dir.is_dir():
+        app.mount(
+            "/assets",
+            StaticFiles(directory=assets_dir),
+            name="assets",
+        )
+
+    @app.get("/", include_in_schema=False)
+    def serve_index():
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa(full_path: str):
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+
+        target = (STATIC_DIR / full_path).resolve()
+        if target.is_file() and target.is_relative_to(STATIC_DIR):
+            return FileResponse(target)
+
+        return FileResponse(STATIC_DIR / "index.html")

@@ -2,12 +2,12 @@
 services:
   # 后端 FastAPI 服务
   backend:
-    # 使用后端目录作为构建上下文
+    # 使用项目根目录作为构建上下文
     build:
-      # 指定后端构建目录
-      context: ./backend
-      # 指定后端 Dockerfile
-      dockerfile: Dockerfile
+      # 指定项目根目录作为构建上下文，便于同时复制 frontend 和 backend
+      context: .
+      # 指定后端多阶段 Dockerfile
+      dockerfile: backend/Dockerfile
     # 指定后端镜像名称
     image: outpatient-his-backend:latest
     # 指定后端容器名称
