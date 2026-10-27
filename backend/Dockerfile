@@ -19,8 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制 FastAPI 应用代码
 COPY app ./app
 
+# 复制数据库初始化脚本
+COPY scripts ./scripts
+
 # 声明后端容器监听 8000 端口
 EXPOSE 8000
 
-# 启动 FastAPI 服务并监听所有网卡
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 启动前初始化测试账号，然后启动 FastAPI 服务
+CMD ["sh", "-c", "python scripts/init_user.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
